@@ -1,0 +1,1368 @@
+/*DiskManager_v4.0
+Displays relative size (%) occupied by each sub-folder in the current folder. 
+*/ 
+
+
+
+
+   global $Preload, $load, $DiskManager;
+   $DiskManager= self ("base");
+  $Requiredversion="08.80.0001";
+  end (<xyver> < $Requiredversion), "Ooops! you need atleast version $Requiredversion for $DiskManager.";
+   $selfpath= self ("path");
+   $DiskManagerINI="$selfpath\DiskManager.ini";  
+    setkey "Set Preload value. Preload= 0 (default) will start Diskmanager without any questions. Preload=1 will let you select the parameters before listing files.", "Tweak#1", "Tweaks", $DiskManagerINI;
+    setkey "Set Hilite color for Size (%) values. Eg: ThreshHilite=. (no color) ThreshHilite= #FFFFFF (White), ThreshHilite= #FFFF33 (Yellow). Default is #99CC00", "Tweak#2", "Tweaks", $DiskManagerINI;
+    setkey "Set Table height. The default value (5.3 or 0.65)depends on your screen setting (% or pix). Increase the Tableheight value to push Usersetting lower. If screensetting is in % then value should range from 3.5 to 8 else value should range from 0.3 to 1. ", "Tweak#3", "Tweaks", $DiskManagerINI;
+  
+
+   getkey $Preload, "Preload", "Usersetting", $DiskManagerINI;
+   IF ($Preload==""){
+   setkey "0", "Preload", "Usersetting", $DiskManagerINI;
+   $Preload="0";
+   }
+   IF ($Preload=="0"){
+   $load="0";
+   }
+   ELSE{
+   $load="1";
+   }
+   sub "_start";
+
+"_start : _start"  
+
+  global $Preload, $load,$DiskManager;
+  
+//DiskManager.ini file path
+  $selfpath= self ("path");
+  $DiskManagerINI="$selfpath\DiskManager.ini";  
+
+////GET & SET keys
+
+//TEMP file
+    getkey $Preload, "Preload", "Usersetting", $DiskManagerINI;
+        
+    getkey $TEMPfile, "TEMPfile", "Usersetting", $DiskManagerINI;
+    
+    IF ($TEMPfile == "") {
+    $TEMPfile= "$selfpath\DiskManager.tmp";
+    setkey $TEMPfile, "TEMPfile", "Usersetting", $DiskManagerINI;
+    }
+
+//SCREENSETTINGS
+   getkey $screenwidth, "Screenwidth", "Usersetting", $DiskManagerINI;
+   getkey $screenheight, "Screenheight", "Usersetting", $DiskManagerINI;
+   getkey $tableheight, "Tableheight", "Usersetting", $DiskManagerINI;
+
+  IF ( $screenwidth== "" || $screenheight == "" ) {
+       $screenwidth=75%;
+       $screenheight=75%;
+       setkey $screenwidth, "Screenwidth", "Usersetting", $DiskManagerINI;
+       setkey $screenheight, "Screenheight", "Usersetting", $DiskManagerINI;
+     }
+  IF ( $tableheight== "") {
+      IF ($screenheight Like "*%*"){
+      $tableheight="5.3";
+       }
+      ELSE{
+      $tableheight="0.65";
+      }      
+      setkey $tableheight, "Tableheight", "Usersetting", $DiskManagerINI;
+     }
+   ELSE {
+      IF ($screenheight Like "*%*" && ($tableheight < "3.5") || ($tableheight > "8")){
+      $tableheight="5.3";
+       }
+      ELSEIF (($screenheight Like "###" || $screenheight Like "####") && ($tableheight > "1") || ($tableheight < "0.3")){
+      $tableheight="0.65";
+      }      
+      ELSE {
+      //nothing
+      }
+      setkey $tableheight, "Tableheight", "Usersetting", $DiskManagerINI;
+     }
+//USER THRESHOLD VALUES   
+  getkey $LowThresh, "LowThresh", "Usersetting", $DiskManagerINI;
+  getkey $HighThresh, "HighThresh", "Usersetting", $DiskManagerINI;
+  getkey $ThreshHilite, "ThreshHilite", "Usersetting", $DiskManagerINI;
+   
+  IF ( $LowThresh== "" || $HighThresh == "" ) {
+       $LowThresh="0";
+       $HighThresh="0";
+       setkey $LowThresh, "LowThresh", "Usersetting", $DiskManagerINI;
+       setkey $HighThresh, "HighThresh", "Usersetting", $DiskManagerINI;
+     }
+  IF ( $ThreshHilite == "" ) {
+       $ThreshHilite="#99CC00";
+       setkey $ThreshHilite, "ThreshHilite", "Usersetting", $DiskManagerINI;
+     }
+//IGNORE SIZE
+
+    getkey $Ignoresize, "Ignoresize", "Usersetting", $DiskManagerINI;
+    getkey $Ignoreunit, "Ignoreunit", "Usersetting", $DiskManagerINI;
+
+  IF ( $Ignoresize== "" || $Ignoresize == "" ) {
+       $Ignoresize="size";
+       $Ignoreunit="bytes";
+       setkey $Ignoresize, "Ignoresize", "Usersetting", $DiskManagerINI;
+       setkey $Ignoreunit, "Ignoreunit", "Usersetting", $DiskManagerINI;
+     }
+     getkey $selected, "selected", "Usersetting", $DiskManagerINI;
+     IF ($selected==""){
+     $selected= <<<SELECTED
+<SELECT NAME="Ignoreunit">
+<OPTION SELECTED> bytes
+<OPTION> KB
+<OPTION> MB
+<OPTION> GB
+</SELECT>
+SELECTED;
+ 
+  replace $selected, $selected, "<crlf>","|";
+  setkey $selected, "selected", "Usersetting", $DiskManagerINI;
+  }
+
+// IF THRESHOLD is switched 
+  IF ($LowThresh > $HighThresh) {
+  $HighThresh=$LowThresh;
+  }
+  
+  
+//FOLDERS ONLY settings
+  getkey $Showfoldersonly, "Showfoldersonly", "Usersetting", $DiskManagerINI;
+  getkey $checked, "Checkbox", "Usersetting", $DiskManagerINI;
+  
+  IF ($Showfoldersonly == "") {
+  $Showfoldersonly="0";
+  $checked="";
+  setkey $Showfoldersonly, "Showfoldersonly", "Usersetting", $DiskManagerINI;
+  setkey $checked, "Checkbox", "Usersetting", $DiskManagerINI;
+  }
+
+//Sortby & Direction
+   getkey $sortbydirection, "sortbydirection", "Usersetting", $DiskManagerINI;
+   getkey $sortby, "sortby", "Usersetting", $DiskManagerINI;
+   IF ($sortbydirection == ""){
+    $sortbydirection="d";
+    setkey $sortbydirection, "sortbydirection", "Usersetting", $DiskManagerINI;
+    }					
+    IF ($sortby == ""){
+    $sortby="size";
+    setkey $sortby, "sortby", "Usersetting", $DiskManagerINI;
+    }	       
+
+//Font TYPE & FONT SIZE from XY
+  getkey $font, "Name", "Font";
+  getkey $fontsize, "MilliSize", "Font";
+  $fontsize=$fontsize/1000;
+
+
+////GET & SET keys
+
+  $fontsize="$fontsize"."pt";
+
+  IF ($screenheight Like "*%*"){
+  $screenconv=substr($screenheight,0,-1);
+  $divheight=$screenconv*$tableheight;
+  }
+  ELSE{
+  $divheight=$screenheight*$tableheight;
+  }
+  $divheight="$divheight"."px";
+
+//Check if current path is My computer
+  IF (<curpath> != %computer% && $start=="1") {
+  $go= inputfolder(<curpath>, "Choose a folder");
+  goto $go;
+  }
+  ELSEIF (<curpath> == %computer%) {
+  $folder = inputfolder("C:\", "Select a Drive/Folder");
+  goto $folder;
+  setting 'AllowRecursion', 1;
+  load *,"_start";
+  }
+  ELSE {
+  //nothing
+  }
+  sel;
+
+//Sortby size, in descending order   
+  sortby $sortby, $sortbydirection;
+
+//Sort Folders apart
+  setting SortFoldersApart, 1;
+//Keep folders on top
+  setting KeepFoldersOnTop, 1;  
+
+//Show folder sizes
+  //setting  ShowFolderSizeInList, 1;
+
+//Show folder sizes
+  #487;
+  
+  $allsize= report ("{Size RAW}+");
+  $total= substr ($allsize, 0,-1);
+  replace $total, $total, "-","0";
+  $total= eval ($total);    
+
+  $totalKB=$total/1024;
+  $totalMB=$totalKB/1024;
+  $totalGB=$totalMB/1024;
+  
+  IF ($totalKB Like "*.*") {
+  $totalKB = substr($totalKB, 0, strpos($totalKB, ".")+3);
+  }
+  ELSE {
+  $totalKB = "$totalKB.00";
+  }
+  IF ($totalMB Like "*.*") {
+  $totalMB = substr($totalMB, 0, strpos($totalMB, ".")+3);
+  }
+  ELSE {
+  $totalMB = "$totalMB.00";
+  }
+  IF ($totalGB Like "*.*") {
+  $totalGB = substr($totalGB, 0, strpos($totalGB, ".")+3);
+  }
+  ELSE {
+  $totalGB = "$totalGB.00";
+  }
+   
+
+  $totaldisplay = regexreplace($total, "(\d{1,3})(?=(\d{3})+(?!\d))", "$1,"); 
+  $totalKBdisplay = regexreplace($totalKB, "(\d{1,3})(?=(\d{3})+(?!\d))", "$1,"); 
+  $totalMBdisplay = regexreplace($totalMB, "(\d{1,3})(?=(\d{3})+(?!\d))", "$1,"); 
+  $totalGBdisplay = regexreplace($totalGB, "(\d{1,3})(?=(\d{3})+(?!\d))", "$1,"); 
+  
+
+//BREADCRUMB
+   $path= <curpath>;
+   replace $path, $path, "\","@";
+   regexreplace $slash, $path, "[^@]";
+   $count= strlen ($slash);
+   incr $count;
+   $path= <curpath>;
+   $token=1;
+   $bread="";
+   $crumb="";
+
+   WHILE ($token<=$count){
+   $branch= gettoken($path, $token,"\");
+   IF ($token==1){
+   $crumb=$branch;
+   }
+   ELSE{
+   $crumb= "$crumb\$branch";
+   }
+   $branch= gettoken($path, $token,"\");
+   $bread="$bread<A HREF=""xys: $crumb"" style=""text-decoration:none""><Font color = #A52A2A><u>$branch</u></font><font color=blue>\</font></A>";
+   incr $token;
+   }
+
+   $displaybread= <<<BREAD
+<TABLE><TD class="special"><b>Current Path:</b>  $bread </TD></TABLE>
+BREAD;
+//BREADCRUMB
+
+
+ 
+
+//CSS STYLING
+
+  $style= <<<STYLE
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" 
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<HEAD>
+
+<STYLE TYPE="text/css">
+
+/* Font settings from XY setup */
+
+body {font-family: $font; 
+      font-size: $fontsize;}
+
+TR   {font-family: $font; 
+      font-size: $fontsize;}
+
+TD   {font-family: $font; 
+       font-size: $fontsize;}
+
+/* Highlight breadcrumb */
+TD.special :hover {background-color: #c5e5c5;}
+
+/* GO... DROP DOWN MENU */
+
+#gomenu {margin: 0;
+	padding: 0;
+	z-index: 30}
+
+#gomenu li { margin: 0;
+	     padding: 0;
+	     list-style: none;
+	     float: left;}
+
+#gomenu li a { display: block;
+	       margin: 0 1px 0 0;
+	       padding: 2px 2px;
+	       width: 40px;
+	       background: #5970B2;
+	       color: #FFF;
+	       text-align: center;
+	       text-decoration: none}
+
+#gomenu li a:hover { background: #49A3FF}
+
+#gomenu div  {position: absolute;
+	      visibility: hidden;
+	      margin: 0;
+	      padding: 0;
+	      background: #444;
+	      border: 1px solid #5970B2}
+
+#gomenu div a {position: relative;
+	       display: block;
+	       margin: 0;
+	       padding: 1px 2px;
+	       width: auto;
+	       white-space: nowrap;
+	       text-align: left;
+	       text-decoration: none;
+	       background: #444;
+	       color: #FFF;}
+
+#gomenu div a:hover {background: #000;
+		     color: #FFF}
+
+/* FIXED HEADER */
+
+/* Scrollable Content Height */
+.scrollContent { height:100px;
+                 overflow-x:hidden;
+                 overflow-y:auto;}
+
+.scrollContent tr {height: auto;
+                   white-space: nowrap;}
+
+
+/* Fixed Header Height */
+.fixedHeader tr { position: relative;
+                  height: auto;
+
+ /* this fixes IE header jumping bug when mousing over rows in the tbody */
+ top: expression( this.parentNode.parentNode.parentNode.scrollTop + 'px' );
+}
+
+/* Table Header formatting */
+.headerFormat { background-color: white;
+                color: #FFFFFF;
+                margin: 3px;
+                padding: 1px;
+                white-space: nowrap;
+                text-decoration: none;
+                font-weight: bold;}
+
+.headerFormat a{color: #FFFFFF;
+               }
+
+.headerFormat a:hover{color: #999999;
+               }
+
+.headerFormat tr td { border: 1px solid #000000;
+                      background-color: #666666;}
+
+/* Table Body (Scrollable Content) formatting */
+.bodyFormat tr td { color: #000000;
+	            border: 0px none;}
+
+
+/* Styles used for SORTING */
+}
+
+table.scrollTable tr:hover { background-color: #c5e5c5;
+	                     color: #006600;
+	                     font-style: normal;}
+
+.hoverMe { background-color: #c5e5c5;
+	   color: #006600;
+	   font-style: normal;}
+
+</STYLE>
+
+<!--[if IE]>
+<style type="text/css">
+/* IE Specific Style addition to constrain table from automatically growing in height */
+div.TableContainer {
+ height: 121px; 
+ overflow-x:hidden;
+ overflow-y:auto;
+}
+</style>
+<![endif]-->
+
+
+<script type="text/javascript">
+
+//GO MENU
+
+var timeout	= 500;
+var closetimer	= 0;
+var ddmenuitem	= 0;
+
+// open hidden layer
+function mopen(id)
+{	
+	// cancel close timer
+	mcancelclosetime();
+
+	// close old layer
+	if(ddmenuitem) ddmenuitem.style.visibility = 'hidden';
+
+	// get new layer and show it
+	ddmenuitem = document.getElementById(id);
+	ddmenuitem.style.visibility = 'visible';
+
+}
+// close showed layer
+function mclose()
+{
+	if(ddmenuitem) ddmenuitem.style.visibility = 'hidden';
+}
+
+// go close timer
+function mclosetime()
+{
+	closetimer = window.setTimeout(mclose, timeout);
+}
+
+// cancel close timer
+function mcancelclosetime()
+{
+	if(closetimer)
+	{
+		window.clearTimeout(closetimer);
+		closetimer = null;
+	}
+}
+
+document.onclick = mclose; 
+
+
+//FIXED HEADER
+
+HoverRow = function() {
+
+ if (document.all) {
+  var table_rows = 0;
+	
+  var allTableTags=document.getElementsByTagName("table"); 
+  for (i=0; i<allTableTags.length; i++) { 
+   // If this table uses the "scrollTable" class then get a reference to its body and first row
+   if (allTableTags[i].className=="scrollTable") { 
+    table_body = allTableTags[i].getElementsByTagName("tbody");
+    table_rows = table_body[0].getElementsByTagName("tr");
+    i = allTableTags.length + 1; // Force an exit from the loop - only interested in first table match
+   } 
+  } 
+
+  
+  for (var i=0; i<table_rows.length; i++) {
+   if (table_rows[i].className != "title" && table_rows[i].className != "total") {
+    table_rows[i].onmouseover=function() {this.className += " hoverMe";}
+    table_rows[i].onmouseout=function() {this.className=this.className.replace(new RegExp(" hoverMe\\b"), "");}
+   }
+  } // End of for loop
+  
+ } // End of "If an IE browser"
+
+}
+if (window.attachEvent) window.attachEvent("onload", HoverRow);
+
+</script>
+
+</HEAD>
+
+<body>
+
+STYLE;
+
+//JUMP DROP-DOWN MENU
+  $jump=<<<JUMP
+<ul id="gomenu">
+    <li><a href="#" onmouseover="mopen('m1')" onmouseout="mclosetime()">Go...</a>
+        <div id="m1" onmouseover="mcancelclosetime()" onmouseout="mclosetime()">
+           <A HREF="xys: Choose folder" class="menu1">Choose folder</A>
+           <font color=#444444>-</font>
+           <A HREF="xys: My Computer" class="item2">My Computer</A>
+           <A HREF="xys: My Documents" classID="menu2">My Documents</A>
+           <A HREF="xys: Desktop" classID="menu2">Desktop</A>
+           <A HREF="xys: Program Files" classID="menu2">Program Files</A>
+           <font color=#444444>-</font>
+           <A HREF="xys: Favorites" classID="menu3">Favorites</A>
+           <A HREF="xys: Recent locations" classID="menu3">Recent locations</A>
+           <A HREF="xys: Hotlist" classID="menu3">Hotlist</A>
+           <A HREF="xys: Breadcrumb" classID="menu3">Breadcrumb</A>
+        </div>
+    </li>   
+</ul>
+<div style="clear:both"></div>
+
+JUMP;
+//DROPDOWN MENU 
+
+
+//HEADER 
+  $header= <<<HEADER
+<TR BGCOLOR=#FCFCF9 width=100%>
+	<TD class="special" colspan=5>
+		<B>Path:</B> $bread &nbsp&nbsp&nbsp
+        </TD>
+        <TD>
+		<B>Size:</B> $totaldisplay <FONT color=#996600> bytes</font> | $totalKBdisplay <FONT color=#151B8D>KB</font> | $totalMBdisplay <FONT color=#347C17>MB</font> | $totalGBdisplay <FONT color= #E42217>GB</font>
+	</TD>
+</TR>
+
+HEADER;
+//HEADER
+
+//SET VARIABLES
+  $items=getinfo("Countitems");
+  $size= report ("{Size RAW} <crlf>");
+  $name= report ("{Fullname} <crlf>");
+  $percent= report ("({Size RAW}/$total) *100 <crlf>");
+  $count=1;
+  $token=1;
+  $Rowbgcolor="#FFFFFF";
+  $Percentfontcolor="#000000";
+  $hidden=0;
+
+  $displayname="Name";
+  $displaysize="Size";
+  $displaypercent="Size %";
+  $displaybargraph="Bar Graph";
+  //$uparrow=chr(8593);
+  //$downarrow=chr(8595);
+  //$uparrow=chr(8657);
+  //$downarrow=chr(8659);
+  $uparrow=chr(9650);
+  $downarrow=chr(9660);
+  IF ($sortby == "name" && $sortbydirection=="a"){
+  $displayname=$uparrow. $displayname;
+  }
+  ELSEIF ($sortby == "name" && $sortbydirection=="d"){
+  $displayname=$downarrow. $displayname;
+  }
+
+  IF ($sortby == "size" && $sortbydirection=="a"){
+  $displaysize=$uparrow. $displaysize;
+  $displaypercent=$uparrow. $displaypercent;
+  $displaybargraph=$uparrow. $displaybargraph;
+  }
+  ELSEIF ($sortby == "size" && $sortbydirection=="d"){
+  $displaysize=$downarrow. $displaysize;
+  $displaypercent=$downarrow. $displaypercent;
+  $displaybargraph=$downarrow. $displaybargraph;
+  } 
+
+
+
+
+//SET VARIABLES
+  
+//TEMPLATE for HEADER ROW  
+  $firstrow= <<<HEADERROW
+
+<table cellpadding="0" cellspacing="0" border="0" width=100%>
+	<tr width=100%>
+		<td>
+			<div id="TableContainer" class="TableContainer" style="height: $divheight;">
+
+ 				<table class="scrollTable" width=100%>
+  					<thead class="fixedHeader headerFormat">
+      						<tr class="title">
+       							<td class="point"> <b>#</b> </td>
+       							<td class="point"> <b><a href= "xys:Headername" style="text-decoration:none">$displayname</a></b> </td>
+       							<td class="point" width=90 align=middle> <b><a href= "xys:Headersize" style="text-decoration:none">$displaysize</a></b> </td>
+       							<td class="point" width=70 align=middle> <b><a href= "xys:Headersize" style="text-decoration:none">$displaypercent</a></b> </td>
+       							<td class="point" width=200 align=middle> <b><a href= "xys:Headersize" style="text-decoration:none">$displaybargraph</a></b> </td>
+      						</tr>
+  					</thead>
+ 						<tbody class="scrollContent bodyFormat" style="height:200px;">    
+
+HEADERROW;
+//TEMPLATE for HEADER ROW  
+
+  IF ($load=="0"){  //PRELOAD curly
+
+//Write header row to temp file
+  writefile ("$TEMPfile", "", o);
+  status "WAIT! gathering info... (ESC to stop)","FF0000",progress;
+
+//WHILE LOOP START: to get each files info and write to temp file until end of items
+
+
+  WHILE ($token<=$items) 
+   { //WHILE
+  $newname= gettoken ($name,$token,"<crlf>");
+
+  
+
+  $FoldersONLY="0";
+////FOLDER & FILE SETTINGS
+  IF (exists ($newname) == "2") {
+    $namecolor="#A52A2A";    
+  }
+
+  ELSE {
+  $namecolor="#000000";
+  IF ($Showfoldersonly == "1"){
+    $FoldersONLY="1";
+    }
+  }
+
+  
+  $newsize= gettoken ($size,$token,"<crlf>");
+
+
+//IF folder size not fetched
+  IF ($newsize==" "){
+  setting 'AllowRecursion', 1;
+  load *,"_start";
+  }
+  
+  IF ($newsize <= 1024) {
+  $unit= "bytes";
+  $unitcolor= "#996600";
+  }
+  ELSEIF ($newsize > 1024 && $newsize <= 1048576) {
+  $unit= "KB";
+  $newsize=$newsize/1024;
+  $unitcolor= "#151B8D";
+  }
+  ELSEIF ($newsize > 1048576 && $newsize <= 1073741824) {
+  $unit= "MB";
+  $newsize=$newsize/1048576;
+  $unitcolor= "#347C17";
+  }
+  ELSEIF ($newsize > 1073741824) {
+  $unit= "GB";
+  $newsize=$newsize/1073741824;
+  $unitcolor= "#E42217";
+  }
+ 
+  IF ($newsize == "- " || $newsize == "0") {
+   $newsize="-";
+   $evalpercent="-";
+   $displaypercent="-";
+   $unit="";
+   }
+  ELSE{
+  $newpercent= gettoken ($percent,$token,"<crlf>");
+  $evalpercent= eval ($newpercent);
+  IF ($evalpercent Like "*.*") {
+  $evalpercent = substr($evalpercent, 0, strpos($evalpercent, ".")+3);
+  }
+  ELSE {
+  $evalpercent = "$evalpercent.00";
+  }  
+  $displaypercent="$evalpercent%";  
+  }
+
+
+
+  $findpos = strpos ($newsize, ".");
+  IF ($newsize Like "*.*") {
+  $newsize = substr($newsize, 0, strpos($newsize, ".")+3);
+  
+  }
+  ELSE {
+  $newsize=$newsize;
+  }
+  
+  $newsize = regexreplace($newsize, "(\d{1,3})(?=(\d{3})+(?!\d))", "$1,"); 
+
+
+  $Rowbgcolor="#FFFFFF";
+  $Percentbackcolor="";
+  $Percentfontcolor="#000000";
+
+//evaluate if row number is Odd
+  IF ($count/2 Like "*.5") {
+  $Rowbgcolor="#EEEEEE";
+  }
+
+
+//Apply user setting for highlighting Size (%) column
+  
+  IF ($evalpercent => $LowThresh && $evalpercent < $HighThresh) {
+  $Percentbackcolor=$ThreshHilite;
+  $Percentfontcolor="black";
+  }
+
+  
+//Set TD width (in pixels) to twice the percentage. i.e. if percent is 35 set as 75 pixels 
+  $widthfill=$evalpercent*2;
+  //$restpercent=100-$evalpercent;
+  //$widthempty=$restpercent*2;
+  $widthfill="$widthfill"."px";
+  //$widthempty="$widthempty"."px";
+
+
+//BAR GRAPH
+  IF ($evalpercent =="0" || $evalpercent =="-"){
+  $barcolor=$Rowbgcolor;
+  }
+  ELSEIF ($evalpercent > $HighThresh){
+  $barcolor="#990000";
+  }
+  ELSEIF ($evalpercent < $LowThresh){
+  $barcolor="#0000A0";
+  }
+  ELSE {
+  $barcolor="#99CC00";
+  }
+//BAR GRAPH
+
+  
+ 
+//CONDITION TO SHOW FOLDERS ONLY
+  IF ($FoldersONLY == "0") {//Show Folders Only
+    
+//CONDITIONS FOR IGNORING FILESIZE
+
+    IF ($Ignoresize != "size" && $Ignoresize >= "1" && $newsize=="-"){
+    incr $count;
+    incr $token;
+    }
+
+  ELSEIF ($Ignoreunit == "" || $Ignoreunit == "unit" || $Ignoresize =="" || $Ignoresize =="0" || $Ignoresize =="size" || $newsize=="-") 
+    { //DEFAULT
+   
+//TEMPLATE for each row in table
+  $addrow= <<<ADDROW
+  		<TR bgcolor=$Rowbgcolor class="alternateRow">
+    			<TD align=middle class>
+      				<a href= "xys: $newname" style="text-decoration:none"><Font color = black>$count</font></A>
+    			</TD>
+    			<TD>
+      				<a href= "xys: $newname" style="text-decoration:none"><Font color = $namecolor>$newname</font></A>
+     			</TD>
+    			<TD align=right width=90>
+     				<a href= "xys: $newname" style="text-decoration:none"><Font color = black>$newsize </font><Font color=$unitcolor>$unit</font></A>
+    			</TD>
+    			<TD align=right width=70>
+     				<a href= "xys: $newname" style="text-decoration:none"><FONT style="BACKGROUND-COLOR: $Percentbackcolor"><font color=$Percentfontcolor>$displaypercent</font></font></A>
+    			</TD>    
+    			<TD>
+    				<TABLE BORDER="0" CELLPADDING="0" CELLSPACING="0">
+           				<TR>
+						<TD BGCOLOR=$barcolor> 
+							<a href= "xys: $newname" style="width:$widthfill;text-decoration:none;">
+							</A>
+						</TD>
+						
+					</TR>
+    				</TABLE>
+   			</TD> 
+   		</TR>  
+ADDROW;
+//TEMPLATE
+  
+  incr $count;
+  incr $token;
+  incr $hidden;
+//Write row to temp file
+  writefile ("$TEMPfile", $addrow, a);
+       } //DEFAULT
+
+ 
+     
+  ELSEIF ($Ignoreunit LikeI "gb") { //GB
+   IF ($unit == "GB" && $newsize >= $Ignoresize) {  
+       
+//TEMPLATE for each row in table
+  $addrow= <<<ADDROW
+  		<TR bgcolor=$Rowbgcolor class="alternateRow">
+    			<TD align=middle class>
+      				<a href= "xys: $newname" style="text-decoration:none"><Font color = black>$count</font></A>
+    			</TD>
+    			<TD>
+      				<a href= "xys: $newname" style="text-decoration:none"><Font color = $namecolor>$newname</font></A>
+     			</TD>
+    			<TD align=right width=90>
+     				<a href= "xys: $newname" style="text-decoration:none"><Font color = black>$newsize </font><Font color=$unitcolor>$unit</font></A>
+    			</TD>
+    			<TD align=right width=70>
+     				<a href= "xys: $newname" style="text-decoration:none"><FONT style="BACKGROUND-COLOR: $Percentbackcolor"><font color=$Percentfontcolor>$displaypercent</font></font></A>
+    			</TD>    
+    			<TD>
+    				<TABLE BORDER="0" CELLPADDING="0" CELLSPACING="0">
+           				<TR>
+						<TD BGCOLOR=$barcolor> 
+							<a href= "xys: $newname" style="width:$widthfill;text-decoration:none;">
+							</A>
+						</TD>
+						
+					</TR>
+    				</TABLE>
+   			</TD> 
+   		</TR>  
+ADDROW;
+//TEMPLATE
+  
+  incr $count;
+  incr $token;
+  incr $hidden;
+//Write row to temp file
+  writefile ("$TEMPfile", $addrow, a);
+    }
+
+  ELSE {
+  incr $count;
+  incr $token;
+       }
+       } //GB
+
+  ELSEIF ($Ignoreunit LikeI "mb") {//MB
+  IF (($unit == "MB" && $newsize >= $Ignoresize) || $unit == "GB" ) {   
+  
+      
+//TEMPLATE for each row in table
+  $addrow= <<<ADDROW
+  		<TR bgcolor=$Rowbgcolor class="alternateRow">
+    			<TD align=middle class>
+      				<a href= "xys: $newname" style="text-decoration:none"><Font color = black>$count</font></A>
+    			</TD>
+    			<TD>
+      				<a href= "xys: $newname" style="text-decoration:none"><Font color = $namecolor>$newname</font></A>
+     			</TD>
+    			<TD align=right width=90>
+     				<a href= "xys: $newname" style="text-decoration:none"><Font color = black>$newsize </font><Font color=$unitcolor>$unit</font></A>
+    			</TD>
+    			<TD align=right width=70>
+     				<a href= "xys: $newname" style="text-decoration:none"><FONT style="BACKGROUND-COLOR: $Percentbackcolor"><font color=$Percentfontcolor>$displaypercent</font></font></A>
+    			</TD>    
+    			<TD>
+    				<TABLE BORDER="0" CELLPADDING="0" CELLSPACING="0">
+           				<TR>
+						<TD BGCOLOR=$barcolor> 
+							<a href= "xys: $newname" style="width:$widthfill;text-decoration:none;">
+							</A>
+						</TD>
+						
+					</TR>
+    				</TABLE>
+   			</TD> 
+   		</TR>  
+ADDROW;
+//TEMPLATE
+  
+  incr $count;
+  incr $token;
+  incr $hidden;
+//Write row to temp file
+  writefile ("$TEMPfile", $addrow, a);
+     }
+
+  ELSE {
+  incr $count;
+  incr $token;
+       }
+       }//MB
+  
+  ELSEIF ($Ignoreunit LikeI "kb") {//KB 
+  IF (($unit == "KB" && $newsize >= $Ignoresize) || ($unit == "GB" || $unit == "MB")) {
+       
+//TEMPLATE for each row in table
+  $addrow= <<<ADDROW
+  		<TR bgcolor=$Rowbgcolor class="alternateRow">
+    			<TD align=middle class>
+      				<a href= "xys: $newname" style="text-decoration:none"><Font color = black>$count</font></A>
+    			</TD>
+    			<TD>
+      				<a href= "xys: $newname" style="text-decoration:none"><Font color = $namecolor>$newname</font></A>
+     			</TD>
+    			<TD align=right width=90>
+     				<a href= "xys: $newname" style="text-decoration:none"><Font color = black>$newsize </font><Font color=$unitcolor>$unit</font></A>
+    			</TD>
+    			<TD align=right width=70>
+     				<a href= "xys: $newname" style="text-decoration:none"><FONT style="BACKGROUND-COLOR: $Percentbackcolor"><font color=$Percentfontcolor>$displaypercent</font></font></A>
+    			</TD>    
+    			<TD>
+    				<TABLE BORDER="0" CELLPADDING="0" CELLSPACING="0">
+           				<TR>
+						<TD BGCOLOR=$barcolor> 
+							<a href= "xys: $newname" style="width:$widthfill;text-decoration:none;">
+							</A>
+						</TD>
+						
+					</TR>
+    				</TABLE>
+   			</TD> 
+   		</TR>  
+ADDROW;
+//TEMPLATE
+  
+  incr $count;
+  incr $token;
+  incr $hidden;
+//Write row to temp file
+  writefile ("$TEMPfile", $addrow, a);
+      }
+
+     ELSE {
+  incr $count;
+  incr $token;
+       }      
+       }//KB
+  
+  ELSEIF ($Ignoreunit LikeI "bytes") {//es
+    IF (($unit LikeI "bytes" && $newsize >= $Ignoresize) || ($unit !="bytes")) {  
+      
+//TEMPLATE for each row in table
+  $addrow= <<<ADDROW
+  		<TR bgcolor=$Rowbgcolor class="alternateRow">
+    			<TD align=middle class>
+      				<a href= "xys: $newname" style="text-decoration:none"><Font color = black>$count</font></A>
+    			</TD>
+    			<TD>
+      				<a href= "xys: $newname" style="text-decoration:none"><Font color = $namecolor>$newname</font></A>
+     			</TD>
+    			<TD align=right width=90>
+     				<a href= "xys: $newname" style="text-decoration:none"><Font color = black>$newsize </font><Font color=$unitcolor>$unit</font></A>
+    			</TD>
+    			<TD align=right width=70>
+     				<a href= "xys: $newname" style="text-decoration:none"><FONT style="BACKGROUND-COLOR: $Percentbackcolor"><font color=$Percentfontcolor>$displaypercent</font></font></A>
+    			</TD>    
+    			<TD>
+    				<TABLE BORDER="0" CELLPADDING="0" CELLSPACING="0">
+           				<TR>
+						<TD BGCOLOR=$barcolor> 
+							<a href= "xys: $newname" style="width:$widthfill;text-decoration:none;">
+							</A>
+						</TD>
+						
+					</TR>
+    				</TABLE>
+   			</TD> 
+   		</TR>  
+ADDROW;
+//TEMPLATE
+  
+  incr $count;
+  incr $token;
+  incr $hidden;
+//Write row to temp file
+  writefile ("$TEMPfile", $addrow, a);
+       }
+       ELSE {
+  incr $count;
+  incr $token;
+       }   
+    }//es
+//CONDITIONS FOR IGNORING FILESIZE
+    
+
+   }//Show folders only
+   ELSE {
+  incr $count;
+  incr $token;
+       }
+
+ } 
+//WHILE LOOP ENDS
+ 
+  
+
+  $hidden=$items-$hidden;
+  IF ($hidden == "0") {
+  $hiddencolor="#FFFFFF";
+  }
+  ELSE {
+  $hiddencolor="brick red";
+  }
+
+  IF ($LowThresh == "0" && $HighThresh == "0") {
+  $ThreshColor="#FFFFFF";
+  }
+  ELSE {
+  $ThreshColor="brick red";
+  }
+
+//STATUS BAR
+ $status= <<<STATUS
+  			<TR bgcolor=#999999>
+  				<TD BGCOLOR=black width=4>
+  				</TD>
+    				<TD align=left>
+    					<font color=white>&nbspTotal=$items </font> <font color=$hiddencolor>Hidden=$hidden</font>     
+   				</TD> 
+  				<TD>
+  					<TABLE align=right>
+						<TR>
+  							<TD bgcolor="#0000A0" width="10">
+  							</TD>  
+  							<TD><font color=$ThreshColor> < $LowThresh%</font>
+  							</TD>
+  							<TD bgcolor="#99CC00" width="10">
+  							</TD>
+  							<TD><font color=$ThreshColor>$LowThresh% to $HighThresh%</font>
+  							</TD>
+  							<TD bgcolor="#990000" width="10">
+  							</TD>
+  							<TD><font color=$ThreshColor> > $HighThresh%</font>
+  							</TD>
+  						</TR>
+  					</TABLE>
+				</TD>
+   			</TR>  
+STATUS;
+//STATUS BAR
+
+//Copy contents of TEMP file to variable and delete TEMP file
+  $row=readfile("$TEMPfile");
+  delete 0,0,"$TEMPfile";
+
+ 
+  $rowend = <<<ROWEND
+ 					</tbody>
+ 				</table>
+			</div>
+		</td>
+	</tr>
+</table>
+ROWEND;
+
+  $row= "$row"."$rowend";
+
+
+   }//PRELOAD curly
+
+
+  $Foldersonly_color="";
+  $Ignore_color="";
+  $Highlight_color="";
+  
+  
+  IF ($Showfoldersonly == "1") {
+  $Foldersonly_color="#FFFFCC";
+  }
+  IF ($Ignoresize != "" && $Ignoresize != "size") {
+  $Ignore_color="#FFFFCC";  
+  }
+
+  IF ($LowThresh != "" && $LowThresh != "0" || $HighThresh != "" && $HighThresh != "0" ) {
+  $Highlight_color="#FFFFCC";
+  }
+
+
+   status "Ready!";
+
+  replace $selected, $selected, "|","<crlf>";
+  
+
+//USERSETTING template
+  $Usersetting= <<<USERSETTING
+				<TABLE align=left border=0 cellpadding=8 cellspacing=0>
+					<TR>
+
+						<FORM ACTION="xys:">
+							<TD valign=bottom BGCOLOR="$Foldersonly_color">
+								<FIELDSET>
+									Folders ONLY:<INPUT TYPE="checkbox" title="Check this to Hide files" NAME="FoldersOnly" VALUE="Folder" $checked>
+								</FIELDSET>
+							</TD>
+
+							<TD BGCOLOR="$Ignore_color">
+								<FIELDSET>
+									<LEGEND>
+										Hide items less than
+									</LEGEND>
+										Size: <INPUT TYPE=TEXT title="Enter size" VALUE="$Ignoresize" NAME=Ignoresize size=1>
+										Unit: $selected
+								</FIELDSET>
+							</TD>
+
+							<TD BGCOLOR="$Highlight_color">
+								<FIELDSET>
+									<LEGEND>
+										<FONT style="BACKGROUND-COLOR:$ThreshHilite">Highlight
+										</FONT> Size(%) between
+									</LEGEND>
+
+										<INPUT TYPE=TEXT title="Values above $LowThresh% will be highlighted" VALUE="$LowThresh" NAME=Low size=1> to 
+										<INPUT TYPE=TEXT title="Values below $HighThresh% will be highlighted" VALUE="$HighThresh" NAME=High size=1>
+								</FIELDSET>
+							</TD>
+					</TR>
+				</TABLE>
+					<br>
+				<TABLE>
+					<TR valign="bottom">
+						<TD align=right>
+							<INPUT TYPE="submit" value=Apply> 
+						</TD>
+						</FORM>
+                                                <FORM METHOD="RESET" ACTION="xys:reset">
+							<TD align=left>							
+								<INPUT TYPE="submit" VALUE="Reset">
+							</TD>
+						</FORM>
+					</TR>
+				</TABLE>
+
+USERSETTING;
+
+//USERSETIING template
+
+  
+
+    IF ($load=="1"){
+     IF ($Preload=="1"){
+     $load="0";
+     }
+
+//BUILD DATA TABLE
+  $table= <<<BUILDTABLE
+<TABLE WIDTH=100% BORDER=0 CELLPADDING=1 CELLSPACING=1>
+$style $jump $displaybread $Usersetting
+</TABLE>
+BUILDTABLE;
+//BUILD DATA TABLE
+
+
+//HTML DISPLAY
+  $ShowTable= urldecode(html("$table", "$screenwidth", "$screenheight", "$DiskManager"));
+    }
+
+   ELSE {  
+
+  $table= <<<BUILDTABLE
+<TABLE WIDTH=100% BORDER=0 CELLPADDING=1 CELLSPACING=1>
+$style $jump $header $firstrow $row
+</TABLE>
+<TABLE width=100% CELLPADDING=0 CELLSPACING=0>
+$status
+</TABLE>
+<br>
+$Usersetting
+BUILDTABLE;
+
+
+   $ShowTable= urldecode(html("$table", "$screenwidth", "$screenheight", "$DiskManager"));
+   }
+ 
+  $drive=substr (<curpath>, 0,2);
+
+  
+//CONDITIONS after clicking links in the DISKMANAGER
+      
+      IF ($ShowTable Like "*Choose folder*"){
+      $input= inputfolder (<curpath>, "Select folder");
+      $temppath=$input;
+      replace $temppath, $temppath, "\","@";
+      regexreplace $slash, $temppath, "[^@]";
+      $count= strlen ($slash);
+      $folder=gettoken ($input, $count+1,"\");
+      replace $path, $input, "\$folder","";
+      goto $path;
+      selfilter $folder;
+      focus;
+      $size= report("{Size RAW}",1);
+      step;
+      IF ($size == "") {
+      goto <curpath>;
+      }
+      ELSE {
+      goto $input;
+      }
+     setting 'AllowRecursion', 1;
+     load *,"_start";
+      }
+     ELSEIF ($ShowTable Like "*My Computer"){
+     goto %computer%;
+      setting 'AllowRecursion', 1;
+      load *,"_start";
+     }
+      ELSEIF ($ShowTable Like "*My Documents"){
+      goto %personal%;
+      setting 'AllowRecursion', 1;
+      load *,"_start";
+      }
+       ELSEIF ($ShowTable Like "*Desktop"){
+      goto %desktop%;
+      setting 'AllowRecursion', 1;
+      load *,"_start";
+      }
+      ELSEIF ($ShowTable Like "*Program Files"){
+      goto %programfiles%;
+      setting 'AllowRecursion', 1;
+      load *,"_start";
+      }
+      ELSEIF ($ShowTable Like "*Favorites"){
+      button "favs";
+      setting 'AllowRecursion', 1;
+      load *,"_start";
+      }
+      ELSEIF ($ShowTable Like "*Recent locations"){
+      button "mru";
+      setting 'AllowRecursion', 1;
+      load *,"_start";
+      }
+      ELSEIF ($ShowTable Like "*Hotlist"){
+      button "hotlist";
+      setting 'AllowRecursion', 1;
+      load *,"_start";
+      }
+      ELSEIF ($ShowTable Like "*Breadcrumb"){
+      #525;
+      setting 'AllowRecursion', 1;
+      load *,"_start";
+      }
+
+     ELSEIF ($ShowTable Like "*:*") {
+     goto $ShowTable;
+  
+     setting 'AllowRecursion', 1;
+     load *,"_start";
+     }  
+
+
+  ELSEIF ($ShowTable Like "*Ignoresize=*") {
+  
+  $FindFoldersOnly= strpos ($ShowTable, "FoldersOnly=");
+  $FindIgnoresize= strpos ($ShowTable, "Ignoresize=");
+  $FindIgnoreunit= strpos ($ShowTable, "Ignoreunit=");
+  $Findlow= strpos ($ShowTable, "Low=");
+  $Findhigh= strpos ($ShowTable, "High=");
+  
+  $IgnoresizeAND= strpos ("$ShowTable", "&", $FindIgnoresize);
+  $IgnoresizeEND= $FindIgnoresize + strlen("Ignoresize=");
+  $Ignoresize= substr ($ShowTable, $IgnoresizeEND,  $IgnoresizeAND-$IgnoresizeEND);
+  
+ 
+  $IgnoreunitAND= strpos ("$ShowTable", "&", $FindIgnoreunit);
+  $IgnoreunitEND= $FindIgnoreunit + strlen("Ignoreunit=");
+  $Ignoreunit= substr ($ShowTable, $IgnoreunitEND, $IgnoreunitAND-$IgnoreunitEND);
+  
+    IF ($Ignoreunit=="bytes"){
+     $selected= <<<SELECTED
+<SELECT NAME="Ignoreunit">
+<OPTION SELECTED> bytes
+<OPTION> KB
+<OPTION> MB
+<OPTION> GB
+</SELECT>
+SELECTED;
+  }
+   ELSEIF ($Ignoreunit=="KB"){
+     $selected= <<<SELECTED
+<SELECT NAME="Ignoreunit">
+<OPTION> bytes
+<OPTION SELECTED> KB
+<OPTION> MB
+<OPTION> GB
+</SELECT>
+SELECTED;
+  }
+   ELSEIF ($Ignoreunit=="MB"){
+     $selected= <<<SELECTED
+<SELECT NAME="Ignoreunit">
+<OPTION> bytes
+<OPTION> KB
+<OPTION SELECTED> MB
+<OPTION> GB
+</SELECT>
+SELECTED;
+  }
+    ELSEIF ($Ignoreunit=="GB"){
+     $selected= <<<SELECTED
+<SELECT NAME="Ignoreunit">
+<OPTION> bytes
+<OPTION> KB
+<OPTION> MB
+<OPTION SELECTED> GB
+</SELECT>
+SELECTED;
+  }
+
+  replace $selected, $selected, "<crlf>","|";
+
+  $LowAND= strpos ("$ShowTable", "&", $Findlow);
+  $LowEND= $Findlow + strlen("Low=");
+  $LowThresh= substr ($ShowTable, $LowEND,  $LowAND-$LowEND);
+
+  $HighEND= $Findhigh + strlen("High=");
+  $HighThresh= substr ($ShowTable, $HighEND);
+
+  IF ($LowThresh > $HighThresh) {
+  $HighThresh=$LowThresh;
+  }
+  
+
+  IF ($FindFoldersOnly == "-1") {
+  setkey 0, "Showfoldersonly", "Usersetting", $DiskManagerINI;
+  setkey "", "Checkbox", "Usersetting", $DiskManagerINI;
+  }
+  ELSE {
+  setkey 1, "Showfoldersonly", "Usersetting", $DiskManagerINI;
+  setkey "checked", "Checkbox", "Usersetting", $DiskManagerINI;
+  }
+  setkey $Ignoresize, "Ignoresize", "Usersetting", $DiskManagerINI;
+  setkey $Ignoreunit, "Ignoreunit", "Usersetting", $DiskManagerINI;
+  setkey $selected, "selected", "Usersetting", $DiskManagerINI;
+
+  setkey $LowThresh, "LowThresh", "Usersetting", $DiskManagerINI;
+  setkey $HighThresh, "HighThresh", "Usersetting", $DiskManagerINI;
+  
+  
+  setting 'AllowRecursion', 1;
+  load *,"_start";
+  }
+  
+  ELSEIF ($ShowTable Like "reset") {
+  setkey 0, "Showfoldersonly", "Usersetting", $DiskManagerINI;
+  setkey "", "Checkbox", "Usersetting", $DiskManagerINI;
+
+  setkey "", "Ignoresize", "Usersetting", $DiskManagerINI;
+  setkey "", "Ignoreunit", "Usersetting", $DiskManagerINI;
+
+  setkey "", "LowThresh", "Usersetting", $DiskManagerINI;
+  setkey "", "HighThresh", "Usersetting", $DiskManagerINI;
+  
+  
+  setting 'AllowRecursion', 1;
+  load *,"_start";
+  }  
+  
+  ELSEIF ($ShowTable Like "*Browse folders*"){
+  goto %computer%;
+  setting 'AllowRecursion', 1;
+  load *,"_start";
+  }
+  
+  ELSEIF ($ShowTable Like "*Header*"){
+         IF (($ShowTable == "Headername" && $sortby == "name") || ($ShowTable == "Headersize" && $sortby == "size")) {
+             IF ($sortbydirection == "a") {          
+                  setkey "d", "sortbydirection", "Usersetting", $DiskManagerINI;
+                 }
+             ELSE {
+                   setkey "a", "sortbydirection", "Usersetting", $DiskManagerINI;
+                  }		
+               }
+        
+        ELSE {
+            replace $ShowTable, $ShowTable, "Header","";
+            setkey $ShowTable, "sortby", "Usersetting", $DiskManagerINI;
+            setkey "a", "sortbydirection", "Usersetting", $DiskManagerINI;
+            }
+	
+  setting 'AllowRecursion', 1;
+  load *,"_start";
+  }  
+
+  ELSE{
+  //nothing;
+  }  
+
+   Status "DiskManager closed.";
