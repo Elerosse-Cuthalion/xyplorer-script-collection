@@ -1,0 +1,49 @@
+Snip: CTB 1
+  XYplorer 9.90.0812, 03.05.2011 11:11:10
+Action
+  NewUserButton
+Name
+  Item Store
+Icon
+  :copypath
+ScriptL
+  "Add Selected Items"
+    perm $p_filenamestore;
+    $cntitems = get("countselected");
+    if ($cntitems > 0) {
+      $items = get("selecteditemspathnames");
+      $p_filenamestore = $p_filenamestore$items<crlf>;
+      status "$cntitems item(s) added to store";
+    } else {
+      status "nothing selected", , "alert";
+    }
+  "Add Focused Item"
+    if (strlen(<focitem>) > 0 ) {
+      perm $p_filenamestore;
+      $p_filenamestore = $p_filenamestore<focitem><crlf>;
+      status "1 item added to store";
+    } else {
+      status "nothing focused", , "alert";
+    }
+  "-"
+  "Copy Items Here"
+    if isset($p_filenamestore) {
+      $items = replace($p_filenamestore, <crlf>, "|");
+      copyto <curpath>, $items;
+    } else {
+      status "no items in store", , "alert";
+    }
+  "-"
+  "Edit Item Store..."
+    $contents = isset($p_filenamestore)?$p_filenamestore:"";
+    $p_filenamestore = input("Edit Item Store", , $contents, m);
+  "Copy Store to Clipboard"
+    copytext $p_filenamestore;
+  "-"
+  "Unset Item Store"
+    unset $p_filenamestore;
+    status "item store unset";
+ScriptR
+ 
+FireClick
+  1

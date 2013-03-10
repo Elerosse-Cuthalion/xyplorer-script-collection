@@ -1,0 +1,34 @@
+/*
+Code:
+Action
+  List verious sort options.
+   If you left-click on the button you will get normal sort options offered by XY, while 
+   if you right-click you will get different sort options which will "Sort Folders Apart" 
+   if you sort by Name, Ext, Size or Type but will remove "Sort Folders Apart" option 
+   if you sort by Created, Modified or Accessed.
+Name
+  Sort Button
+Icon
+<xyscript>\icons\sort.ico
+*/
+
+//Save settings
+  #182;
+//Getkeys
+  getkey $count, "count", "CustomButtons";
+  getkey $toolbar, "Toolbar", "General";
+
+//Increment count  
+  incr $count;
+//Button code
+  $button= <<<BUTTONCODE
+"Sortby|:sort|0" "XYSort|:sort" button "sort"   	"Name"¶¶  global $sort;¶¶  $sort=name;¶¶  sub "_eval";¶¶  ¶¶"Ext"¶¶  global $sort;¶¶  $sort=ext;¶¶  sub "_eval";¶¶¶¶"Size"¶¶  global $sort;¶¶  $sort=size;¶¶  sub "_eval";¶¶¶¶"Type"¶¶  global $sort;¶¶  $sort=type;¶¶  sub "_eval";¶¶¶¶"Created"¶¶  global $sort;¶¶  $sort=created;¶¶  sub "_eval";¶¶¶¶"Modified"¶¶  global $sort;¶¶  $sort=modified;¶¶  sub "_eval";¶¶¶¶"Accessed"¶¶  global $sort;¶¶  $sort=accessed;¶¶  sub "_eval";¶¶¶¶¶¶¶¶"eval : _eval"¶¶  global $sort;¶¶  IF ($sort=="name"){¶¶  sub "_nodate";¶¶  }¶¶  ELSEIF ($sort=="ext"){¶¶  sub "_nodate";¶¶  }¶¶  ELSEIF ($sort=="size"){¶¶  sub "_nodate";¶¶  }¶¶  ELSEIF ($sort=="type"){¶¶  sub "_nodate";¶¶  }¶¶  ELSEIF ($sort=="created"){¶¶  sub "_date";¶¶  }¶¶  ELSEIF ($sort=="modified"){¶¶  sub "_date";¶¶  }¶¶  ELSEIF ($sort=="accessed"){¶¶  sub "_date";¶¶  }¶¶  ¶¶"Non-date : _nodate"¶¶  global $sort;¶¶  Settingp SortFoldersApart,1;¶¶  //Settingp KeepFoldersOnTop,1;¶¶  Sortby $sort, clk;¶¶¶¶"Date : _date"¶¶  global $sort;¶¶  Settingp SortFoldersApart,0;¶¶  Sortby $sort,clk;
+BUTTONCODE;
+//Setkeys
+  setkey $count, "count", "CustomButtons";
+  setkey $button, $count, "CustomButtons";
+//append button to current buttons list and setkey
+  $toolbar=$toolbar.",ctb$count";
+  setkey $toolbar, "Toolbar", "General";
+//Restart without saving
+  #190;

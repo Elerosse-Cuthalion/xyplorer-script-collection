@@ -1,0 +1,29 @@
+"Add new button by an snippet"
+     //http://www.xyplorer.com/xyfc/viewtopic.php?p=51737#p51737
+
+     $a = "The following command will look for the next free user button,<crlf>
+      then add it to the right end of the toolbar, and define it<crlf>
+      according to the snippet from the next dialog.";
+     end (confirm($a)?0:1);
+
+     $b = <<<TEXTHEREDOC
+Snip: CTB 1
+  XYplorer 9.50.0002, 13.09.2010 09:00:10
+Action
+  NewUserButton
+Name
+  Various Mini Trees
+Icon
+  :minitree
+ScriptL
+  "Just two drives|:minitree" loadtree "C:|D:";
+  "Just scripts|:minitree" loadtree "<xydata>\scripts";
+  "Tree number three|:minitree" loadtree "%programfiles%|%temp%|<xypath>";
+ScriptR
+
+FireClick
+  1
+TEXTHEREDOC;
+
+     $b = input("Enter Snippet for new toolbar button", , $b, "m");
+     snippet $b;

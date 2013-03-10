@@ -1,0 +1,30 @@
+Snip: CTB 1
+  XYplorer 9.90.0705, 11.04.2011 15:23:03
+Action
+  NewUserButton
+Name
+  Filename Store
+Icon
+  :copypath
+ScriptL
+  "Add Current Filename"
+    if (strlen(<curitem>) > 0 ) {
+      perm $p_filenamestore;
+      $p_filenamestore = $p_filenamestore<curitem><crlf>;
+      status "filename added to store";
+    } else {
+      status "nothing selected", , "alert";
+    }
+  "-"
+  "Edit Store..."
+    $p_filenamestore = input("Edit Filename Store", , $p_filenamestore, m);
+  "Copy Store to Clipboard"
+    copytext $p_filenamestore;
+  "-"
+  "Unset Filename Store"
+    unset $p_filenamestore;
+    status "filename store unset";
+ScriptR
+ 
+FireClick
+  1
